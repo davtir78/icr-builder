@@ -1,0 +1,16 @@
+{
+  "name": "icr-builder",
+  "version": "0.1.0",
+  "description": "Build an Integration Contract Record (ICR v0.2) step by step, in the browser. No server, no build step; nothing leaves the page, except the diagram library, fetched from a public CDN only if you choose to draw.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "author": "David Tirabassi",
+  "scripts": {
+    "test": "node --test",
+    "start": "node serve.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

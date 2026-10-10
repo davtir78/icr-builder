@@ -1,0 +1,6 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>navigated</title>
+<!-- The page an injected <meta http-equiv=refresh> sends the diagram frame to (see sandbox-xss.html, scenario F). -->
+<p>This page was loaded inside the diagram frame.</p>
+<script>parent.postMessage('navigated', String.fromCharCode(42));</script>

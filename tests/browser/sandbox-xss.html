@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sandbox test (running)</title>
+<!--
+  Browser test for the diagram sandbox (needs a real browser and network access to cdn.jsdelivr.net).
+  Serve the repository (node serve.mjs) and open /tests/browser/sandbox-xss.html with this tab in front.
+  The page title becomes "Sandbox test: PASS" or "Sandbox test: FAIL", and the table says what happened.
+
+  The payload is the proof of concept of GHSA-7rqq-prvp-x9jh (CVE-2025-54881): a sequence diagram label that holds
+  HTML next to KaTeX delimiters, which Mermaid 11.0 to 11.9 passes to innerHTML. Here the payload posts a message
+  to the page that embeds the frame, so it is visible when the payload runs. The scenarios:
+
+    A  the vulnerable Mermaid 11.4.0 in the sandbox frame, with the frame's CSP removed (test only):
+       the payload RUNS inside the frame (so the test would notice an effective payload), and nothing reaches this page.
+    B  the same, with the CSP the tool uses: the payload does not run.
+    C  the pinned release in the tool's own frame: the payload does not run.
+    D  the payload tries to write to this page from inside the frame (no CSP): every attempt is refused.
+    E  the pinned release, run in THIS page with no sandbox at all: the payload does not run (the library is patched).
+    F  the vulnerable release in the tool's frame, with a payload that navigates the frame (meta refresh to navigated.html):
+       the CSP does not stop a navigation, so the tool must remove the frame (F2: without the iframe csp attribute, which only
+       Chrome and Edge honour). G is the same payload against the pinned release.
+    H  the same payload sending the frame to a page that never finishes loading (needs tests/browser/hold-server.mjs and
+       ?hold=http://localhost:8124/hold): no load event follows, so the token and the heartbeat must do it. H1 without the
+       iframe csp attribute, H2 with it.
+-->
+<body>
+<h1>Sandbox test</h1>
+<p id="state">Running...</p>
+<table border="1" cellpadding="4" id="out"><thead><tr><th>Scenario</th><th>Drawn</th><th>Payload ran</th><th>Expected</th><th>Result</th></tr></thead><tbody></tbody></table>
+<div id="host"></div>
+<script type="module">
+import { drawDiagram, MERMAID_URL, MERMAID_SRI, FRAME_SANDBOX } from '../../js/mermaid.js';
+
+const OLD = { url: 'https://cdn.jsdelivr.net/npm/mermaid@11.4.0/dist/mermaid.min.js', integrity: 'sha512-qglQ1LSNAz8XKHfeL5cl9/Z7FnG4v9PodzbvytCLA6qJcB5axH9oovvSNlFwMj46jdHHsOQGkEiUGSf3Lrr8Gg==' };
+const payload = (code) => `sequenceDiagram\n  participant A as Alice<img src="x" onerror="${code}">$$\\text{Alice}$$\n  A->>A: hi`;
+const POST = 'parent.postMessage(5,String.fromCharCode(42))'; // quotes and semicolons would be mangled by the diagram label parser
+let received = 0;
+addEventListener('message', (e) => { if (e.data === 5) received++; });
+
+async function scenario(name, source, frame, expectRan) {
+  received = 0;
+  const host = document.getElementById('host');
+  host.replaceChildren();
+  let drawn;
+  try { await drawDiagram(host, source, { frame }); drawn = 'yes'; } catch (e) { drawn = 'no: ' + e.message.slice(0, 60); }
+  await new Promise((r) => setTimeout(r, 1500));
+  const ran = received > 0;
+  const ok = ran === expectRan && drawn === 'yes';
+  const tr = document.createElement('tr');
+  for (const t of [name, drawn, ran ? `yes (${received})` : 'no', expectRan ? 'runs in the frame' : 'does not run', ok ? 'ok' : 'WRONG']) { const td = document.createElement('td'); td.textContent = t; tr.append(td); }
+  document.querySelector('#out tbody').append(tr);
+  return ok;
+}
+
+const results = [];
+if (FRAME_SANDBOX !== 'allow-scripts') results.push(false);
+results.push(await scenario('A vulnerable 11.4.0, sandbox, CSP removed (test only)', payload(POST), { csp: false, ...OLD }, true));
+results.push(await scenario('B vulnerable 11.4.0, sandbox + CSP', payload(POST), { csp: true, ...OLD }, false));
+results.push(await scenario('C pinned release, the tool\'s frame', payload(POST), {}, false));
+
+// D: from inside the frame, try to reach this page. The attempt first posts (so we know the payload ran), then writes.
+let reached = 0;
+for (const attack of ['parent.__pwned=1', 'top.document.title=7', 'parent.localStorage.setItem(1,1)', 'parent.document.cookie']) {
+  const before = { title: document.title, flag: window.__pwned, ls: localStorage.getItem('1') };
+  const ok = await scenario(`D write attempt: ${attack}`, payload(`(${POST},${attack})`), { csp: false, ...OLD }, true);
+  const after = { title: document.title, flag: window.__pwned, ls: localStorage.getItem('1') };
+  if (before.title !== after.title || after.flag !== undefined || after.ls !== null) reached++;
+  results.push(ok);
+}
+results.push(reached === 0);
+const reachRow = document.createElement('tr');
+for (const t of ['D result', '', '', 'this page untouched', reached === 0 ? 'ok' : 'WRONG: the frame reached this page']) { const td = document.createElement('td'); td.textContent = t; reachRow.append(td); }
+document.querySelector('#out tbody').append(reachRow);
+
+// F: the payload navigates the frame itself (a <meta http-equiv=refresh>). The frame's CSP does not stop a navigation,
+// so the tool removes a frame that loads a second time, whether that happens before or after the drawing is reported.
+const NAV_URL = new URL('navigated.html', location.href).href;
+const navPayload = `sequenceDiagram\n  participant A as Alice<meta http-equiv=refresh content=0,url=${NAV_URL}>$$\\text{Alice}$$\n  A->>A: hi`;
+let navigated = 0;
+addEventListener('message', (e) => { if (e.data === 'navigated') navigated++; });
+async function navScenario(name, frame, expectRemoved, embeddedCsp = true) {
+  navigated = 0;
+  const host = document.getElementById('host');
+  host.replaceChildren();
+  let outcome;
+  try { await drawDiagram(host, navPayload, { frame, embeddedCsp }); outcome = 'drawn'; } catch (e) { outcome = /another page/.test(e.message) ? 'refused: it navigated' : 'failed: ' + e.message.slice(0, 50); }
+  await new Promise((r) => setTimeout(r, 2500));
+  const frameLeft = host.querySelector('iframe') !== null;
+  const ok = expectRemoved ? (!frameLeft && /navigated|another page/.test(outcome + host.textContent)) : (frameLeft && outcome === 'drawn' && navigated === 0);
+  const tr = document.createElement('tr');
+  for (const t of [name, outcome, frameLeft ? `frame stays (navigated page loaded: ${navigated})` : `frame removed (navigated page loaded: ${navigated})`, expectRemoved ? 'frame removed' : 'frame stays, no navigation', ok ? 'ok' : 'WRONG']) { const td = document.createElement('td'); td.textContent = t; tr.append(td); }
+  document.querySelector('#out tbody').append(tr);
+  return ok;
+}
+results.push(await navScenario('F vulnerable 11.4.0, sandbox + CSP, meta refresh payload', OLD, true));
+results.push(await navScenario('F2 the same, without the iframe csp attribute (load event only)', OLD, true, false));
+results.push(await navScenario('G pinned release, same payload', {}, false));
+
+// H: the payload sends the frame to a page that never finishes loading (tests/browser/hold-server.mjs holds the response
+// open), so no load event ever follows. The page claims the frame is ready, reports "drawn" with a huge height, and
+// reports whatever it is sent. The tool must not send it the diagram source, must not resize the frame for it, and must
+// remove the frame once its own document's heartbeat stops. Needs the server: open this page with ?hold=http://localhost:8124/hold
+const HOLD = new URLSearchParams(location.search).get('hold');
+let sawDraw = 0;
+addEventListener('message', (e) => { if (e.data && e.data.sawDraw) sawDraw++; });
+const SPIN = new URLSearchParams(location.search).get('spin');
+async function holdScenario(name, embeddedCsp, url = HOLD, maxSeconds = 10) {
+  navigated = 0;
+  sawDraw = 0;
+  const host = document.getElementById('host');
+  host.replaceChildren();
+  const payload = `sequenceDiagram\n  participant A as Alice<meta http-equiv=refresh content=0,url=${url}>$$\\text{Alice}$$\n  A->>A: hi`;
+  let outcome;
+  let tallest = 0;
+  const watch = setInterval(() => { const f = host.querySelector('iframe'); if (f) tallest = Math.max(tallest, parseInt(f.style.height, 10) || 0); }, 100);
+  try { await drawDiagram(host, payload, { frame: OLD, embeddedCsp }); outcome = 'drawn'; } catch (e) { outcome = 'refused: ' + e.message.slice(0, 40); }
+  const drawnAt = performance.now();
+  let tookMs = null;
+  for (let i = 0; i < maxSeconds * 10 && host.querySelector('iframe'); i++) await new Promise((r) => setTimeout(r, 100)); // time for the frame to be removed
+  if (!host.querySelector('iframe')) tookMs = Math.round(performance.now() - drawnAt);
+  await new Promise((r) => setTimeout(r, 1500)); // and the held page keeps talking for a while
+  clearInterval(watch);
+  const removed = host.querySelector('iframe') === null;
+  const ok = removed && sawDraw === 0 && tallest < 3000;
+  const tr = document.createElement('tr');
+  for (const t of [name, outcome, `${removed ? `frame removed after ${tookMs} ms` : 'frame STAYS'}; page was sent the source ${sawDraw} times; tallest ${tallest}px; held page ran ${navigated} time(s)`, 'frame removed, source never sent, never resized', ok ? 'ok' : 'WRONG']) { const td = document.createElement('td'); td.textContent = t; tr.append(td); }
+  document.querySelector('#out tbody').append(tr);
+  return ok;
+}
+if (HOLD) {
+  results.push(await holdScenario('H1 navigation that never finishes (heartbeat and token only)', false));
+  results.push(await holdScenario('H2 the same, with the iframe csp attribute', true));
+}
+if (SPIN) {
+  // S: the page the frame was sent to keeps this page's thread busy (4 s on, 2.5 s off, for ever): it can only do that where it shares
+  // the page's process (Safari, Chrome on Android; here: chrome --disable-site-isolation-trials --disable-features=IsolateSandboxedIframes,SitePerProcess)
+  results.push(await holdScenario('S navigation to a page that keeps this page busy', false, SPIN, 25));
+}
+if (!HOLD) {
+  const tr = document.createElement('tr');
+  for (const t of ['H navigation that never finishes', 'skipped', 'start node tests/browser/hold-server.mjs and open this page with ?hold=http://localhost:8124/hold', 'frame removed', 'skipped']) { const td = document.createElement('td'); td.textContent = t; tr.append(td); }
+  document.querySelector('#out tbody').append(tr);
+}
+
+// E: the patched release, directly in this page (no sandbox), same payload with a flag instead of a message
+await new Promise((res, rej) => { const s = document.createElement('script'); s.src = MERMAID_URL; s.integrity = MERMAID_SRI; s.crossOrigin = 'anonymous'; s.onload = res; s.onerror = () => rej(new Error('load')); document.head.append(s); });
+window.pwnedE = undefined;
+mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
+try { await mermaid.render('e1', payload('window.pwnedE=1')); } catch { /* a parse error is also a pass */ }
+await new Promise((r) => setTimeout(r, 1000));
+const eOk = window.pwnedE === undefined;
+results.push(eOk);
+const eRow = document.createElement('tr');
+for (const t of ['E pinned release directly in this page, no sandbox', 'yes', window.pwnedE ? 'yes' : 'no', 'does not run', eOk ? 'ok' : 'WRONG']) { const td = document.createElement('td'); td.textContent = t; eRow.append(td); }
+document.querySelector('#out tbody').append(eRow);
+
+const pass = results.every(Boolean);
+document.title = `Sandbox test: ${pass ? 'PASS' : 'FAIL'}`;
+document.getElementById('state').textContent = pass ? 'PASS: the payload runs only where the sandbox contains it, and never reaches this page.' : 'FAIL: see the table.';
+</script>
+</body>
+</html>

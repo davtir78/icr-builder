@@ -241,4 +241,6 @@ example `/tools/icr-builder/`.
 
 ## Licence
 
-MIT. Copyright (c) 2026 David Tirabassi.
+The code is MIT. Copyright (c) 2026 David Tirabassi. See [LICENSE](LICENSE).
+
+The bundled sample records (everything in `templates/`) and the text derived from the Integration Contract Record template (the guidance in `js/data/guidance.js`, the schema copies in `js/schema.js` and `tests/fixtures/icr.schema.json`, the template copy `tests/fixtures/template.md`, and the section headings and prompt wording in `js/scaffold.js` and `js/lint.js`) are not MIT. They are licensed under [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/) (CC BY 4.0), Copyright (c) 2026 David Tirabassi / IT Architecture Patterns, from [architecture-records](https://github.com/davtir78/architecture-records). You may copy, adapt and use them, including commercially, if you give credit and say what you changed. [NOTICE](NOTICE) names each file and gives the attribution.

@@ -6,7 +6,9 @@ This repository has two licences. Which one applies depends on the file.
 1. CODE: MIT
    The source code of the ICR Builder is licensed under the MIT License. See the
    file LICENSE. That covers the JavaScript, HTML, CSS and tooling that make the
-   tool work, and the tests, except the files and folders named in section 2.
+   tool work, and the tests, except the files and strings named in section 2.
+   Short labels and hints elsewhere in js/ that echo the template or the
+   specification are part of the code and are MIT.
 
 2. CONTENT: Creative Commons Attribution 4.0 International (CC BY 4.0)
    Copyright (c) 2026 David Tirabassi / IT Architecture Patterns
@@ -23,32 +25,44 @@ This repository has two licences. Which one applies depends on the file.
         templates/0003-contractor-production-files.md
       The three ICR-AB records are copies of the Appointment Booking sample in
       https://github.com/davtir78/architecture-records (samples/appointment-booking/contracts/).
-      The copies here are of an earlier revision than the one now published there.
+      Two of them (ICR-AB-0001 and ICR-AB-0003) are an earlier revision than the one
+      now published there; ICR-AB-0002 is the same as the published one.
       The other three are worked examples of the Integration Contract Record
-      specification. All organisations, names and contacts in all six are fictional.
+      specification (version 0.2, a draft that is not yet published); they are not
+      published anywhere else. All organisations, names and contacts in all six are
+      fictional.
 
-   b. Text derived from the Integration Contract Record template and its schema
-      (https://github.com/davtir78/architecture-records, templates/), that is,
-      their section headings, guidance and front matter schema, as follows:
+   b. Text derived from the Integration Contract Record specification (version
+      0.2, a draft that is not yet published), its template and its front matter
+      schema. The published template and schema are in
+      https://github.com/davtir78/architecture-records (templates/). The files:
         js/data/guidance.js      the guidance text for each section and field
+                                 (taken from the specification)
         js/schema.js             a copy of the front matter schema (only the $id
                                  differs)
         tests/fixtures/icr.schema.json   the same copy of the schema
-        tests/fixtures/template.md       a copy of the template, with its
-                                 placeholders changed
-      and, within the following files, the section headings and the wording of the
-      prompts taken from the template (the code in these two files is MIT):
-        js/scaffold.js           the prompts a new section is filled with
-        js/lint.js               the list of section headings
+        tests/fixtures/template.md       a copy of the specification's template
+      and, within the following two files, these strings (the rest of both files
+      is MIT code):
+        js/lint.js               SECTIONS, the list of section headings, and the
+                                 labels in RULES
+        js/scaffold.js           the prompt text in INTERACTION_BULLETS,
+                                 SECURITY_BY_BOUNDARY, SERVICE_BY_INTERACTION,
+                                 SERVICE_TAIL, ERRORS_BY_INTERACTION,
+                                 ERRORS_LOG_BASED, EXAMPLE_FENCES,
+                                 ACCEPTANCE_BY_INTERACTION and
+                                 ACCEPTANCE_LOG_BASED. COMPONENT_NOTES is the
+                                 tool's own text and is MIT.
 
-   Where a file is named in 2b and its text was shortened, reworded or reordered
-   for the tool, that is a change made to the original.
+   Where a file or string named in 2b was shortened, reworded or reordered for the
+   tool, that is a change made to the original.
 
    You may copy, adapt and use that content, including commercially, if you:
-     - give credit: "Integration Contract Record template and sample records,
-       Copyright (c) 2026 David Tirabassi / IT Architecture Patterns,
-       https://www.itarchitecturepatterns.net, from
-       https://github.com/davtir78/architecture-records, licensed under CC BY 4.0";
+     - give credit: "Integration Contract Record template, specification examples
+       and sample records, Copyright (c) 2026 David Tirabassi / IT Architecture
+       Patterns, https://www.itarchitecturepatterns.net, from
+       https://github.com/davtir78/architecture-records and the ICR Builder,
+       licensed under CC BY 4.0";
      - link to the licence: https://creativecommons.org/licenses/by/4.0/
      - say what you changed; and
      - do not suggest that the licensor endorses you or your use.
@@ -56,6 +70,9 @@ This repository has two licences. Which one applies depends on the file.
    The full licence text is at https://creativecommons.org/licenses/by/4.0/legalcode
    and in the LICENSE file of https://github.com/davtir78/architecture-records.
 
+Keep LICENSE and NOTICE with any copy of this tool or of its content.
+
 Nothing else in this repository is licensed under CC BY 4.0. The names of the
-integration patterns in js/data/patterns.js are the titles of pages of
-https://www.itarchitecturepatterns.net, listed so the tool works offline.
+integration patterns in js/data/patterns.js and tests/fixtures/pattern-titles.txt
+are the titles of pages of https://www.itarchitecturepatterns.net, listed so the
+tool works offline.

@@ -212,7 +212,9 @@ serve.mjs                  a zero-dependency static server
 The builder is static files: `index.html`, `css/`, `js/` and `templates/` (the worked examples, fetched on request). There
 is no server code and no build step. To serve it from another site, copy those four to any folder the site serves, for
 example `/tools/icr-builder/`.
-Keep `LICENSE` and `NOTICE` with the copy (the code is MIT and the bundled records and template-derived text are CC BY 4.0, which both ask for their notice to travel), or show the credit from the NOTICE (section 2) on the page that serves the tool.
+Keep `LICENSE` and `NOTICE` with the copy (the code is MIT and the bundled records and template-derived text are CC BY
+4.0, which both ask for their notice to travel), or show the credit from the NOTICE (section 2) on the page that
+serves the tool.
 
 - All paths are relative and routing is hash-based (`#/section/...`), so the folder can be anywhere and a `<base href>`
   pointing at it is safe. Serve it with `Cache-Control: no-cache`, so that an update shows without a hard reload.
